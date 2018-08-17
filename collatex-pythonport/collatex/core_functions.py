@@ -6,7 +6,7 @@ Created on May 3, 2014
 import re
 from xml.etree import ElementTree as etree
 from xml.dom.minidom import Document
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from collatex.core_classes import Collation, VariantGraph, join, AlignmentTable, VariantGraphRanking
 from collatex.exceptions import SegmentationError
 from collatex.experimental_astar_aligner import ExperimentalAstarAligner
@@ -102,19 +102,54 @@ def export_alignment_table_as_json(table, indent=None, status=False):
     return json.dumps(json_output, sort_keys=True, indent=indent, ensure_ascii=False)
 
 
+# def export_alignment_table_as_xml(table):
+#     readings = []
+#     for column in table.columns:
+#         app = etree.Element('app')
+#         for key, value in sorted(column.tokens_per_witness.items()):
+#             child = etree.Element('rdg')
+#             child.attrib['wit'] = "#" + key
+#             child.text = "".join(str(item.token_data["t"]) for item in value)
+#             app.append(child)
+#         # Without the encoding specification, outputs bytes instead of a string
+#         result = etree.tostring(app, encoding="unicode")
+#         readings.append(result)
+#     return "<root>" + "".join(readings) + "</root>"
+
+
 def export_alignment_table_as_xml(table):
-    readings = []
+    d = Document()
+    root = d.createElementNS("http://interedition.eu/collatex/ns/1.0", "cx:apparatus") # fake namespace declarations
+    root.setAttribute("xmlns:cx","http://interedition.eu/collatex/ns/1.0")
+    d.appendChild(root)
     for column in table.columns:
-        app = etree.Element('app')
-        for key, value in sorted(column.tokens_per_witness.items()):
-            child = etree.Element('rdg')
-            child.attrib['wit'] = "#" + key
-            child.text = "".join(str(item.token_data["t"]) for item in value)
-            app.append(child)
-        # Without the encoding specification, outputs bytes instead of a string
-        result = etree.tostring(app, encoding="unicode")
-        readings.append(result)
-    return "<root>" + "".join(readings) + "</root>"
+        # column.tokens_per_witness.items() is a dictionary that maps a wit value
+        #   to a list (in case of segmentation) of tokens
+        # access token information with value[x].token_data["n"] (or ["t"])
+        # create { "n" : [ ("t", "wit") , ... ]} to support output
+        # <rdgGrp n="n"><rdg wit="wit">t</rdg> ... </rdgGrp>
+        app = d.createElement("app")
+        root.appendChild(app)
+        reading = namedtuple("reading", ["t", "wit"])
+        rdgDict = defaultdict(list)
+        for key, value in column.tokens_per_witness.items():
+            wit = key
+            t_value = "".join(str(item.token_data["t"]) for item in value)
+            n_value = str([str(item.token_data["n"]) for item in value])
+            rdgDict[n_value].append(reading(t=t_value, wit=wit))
+        for key,value in sorted(rdgDict.items()):
+            rdgGrp = d.createElement("rdgGrp")
+            rdgGrp.setAttribute("n", key)
+            app.appendChild(rdgGrp)
+            for v in value:
+                rdg = d.createElement("rdg")
+                rdg.setAttribute("wit", v.wit)
+                text_node = d.createTextNode(v.t)
+                rdg.appendChild(text_node)
+                rdgGrp.appendChild(rdg)
+        result = d.toprettyxml()
+    return result
+
 
 def export_alignment_table_as_tei(table, indent=None):
     d = Document()
