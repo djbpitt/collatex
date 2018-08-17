@@ -3,8 +3,9 @@ Created on May 3, 2014
 
 @author: Ronald Haentjens Dekker
 """
-import re
-from xml.etree import ElementTree as etree
+# import re
+# from xml.etree import ElementTree as etree
+from typing import List, Type
 from xml.dom.minidom import Document
 from collections import defaultdict, namedtuple
 from collatex.core_classes import Collation, VariantGraph, join, AlignmentTable, VariantGraphRanking
@@ -131,7 +132,7 @@ def export_alignment_table_as_xml(table):
         app = d.createElement("app")
         root.appendChild(app)
         reading = namedtuple("reading", ["t", "wit"])
-        rdgDict = defaultdict(list)
+        rdgDict = defaultdict(list) # type: List[reading]
         for key, value in column.tokens_per_witness.items():
             wit = key
             t_value = "".join(str(item.token_data["t"]) for item in value)
